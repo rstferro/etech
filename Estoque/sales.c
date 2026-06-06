@@ -325,8 +325,56 @@ void append_quote_csv(const char *seller, CartItem *cart, int cartCount) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Relatório mensal (modal raygui)                                      */
+/* Exportação mensal                                                    */
 /* ------------------------------------------------------------------ */
+
+int ExportarVendasMes(int year, int month, int forcar) {
+    char outPath[128];
+    snprintf(outPath, sizeof(outPath), "vendas_%04d_%02d.csv", year, month);
+
+    /* Se não forçado e o arquivo já existe, não sobrescreve */
+    if (!forcar) {
+        FILE *check = fopen(outPath, "rb");
+        if (check) { fclose(check); return 0; }
+    }
+
+    EnterCriticalSection(&g_csvLock);
+    FILE *in = fopen(SALES_FILE, "rb");
+    if (!in) { LeaveCriticalSection(&g_csvLock); return -1; }
+
+    FILE *out = fopen(outPath, "wb");
+    if (!out) { fclose(in); LeaveCriticalSection(&g_csvLock); return -1; }
+
+    char line[4096];
+
+    /* Copia o cabeçalho integralmente */
+    if (fgets(line, sizeof(line), in))
+        fputs(line, out);
+
+    /* Copia apenas as linhas do mês/ano solicitado */
+    while (fgets(line, sizeof(line), in)) {
+        int sy = 0, sm = 0, sd = 0;
+        if (sscanf(line, "%d-%d-%d", &sy, &sm, &sd) == 3
+                && sy == year && sm == month)
+            fputs(line, out);
+    }
+
+    fclose(out);
+    fclose(in);
+    LeaveCriticalSection(&g_csvLock);
+    return 1;
+}
+
+int VerificarEExportarMesAtual(void) {
+    int year, month, day;
+    current_date_parts(&year, &month, &day);
+    int dim          = days_in_month(year, month);
+    int dias_restantes = dim - day;
+
+    if (dias_restantes <= EXPORT_DIAS_ANTES_FIM)
+        return ExportarVendasMes(year, month, 0); /* não sobrescreve se já existe */
+    return 0;
+}
 
 void DrawMonthlySalesModal(void) {
     SaleSummary rows[MAX_SALES_SUMMARY];
@@ -406,10 +454,33 @@ void DrawMonthlySalesModal(void) {
                  panel.x+16, panel.y+548, 20, COL_TEXT_DIM);
     }
 
+    /* Botão de exportação manual + feedback */
+    static char s_exportMsg[128] = {0};
+
+    if (GuiButton((Rectangle){panel.x + panel.width - 320,
+                               panel.y + panel.height - 52, 150, 36},
+                  "Exportar CSV")) {
+        int r = ExportarVendasMes(year, month, 1);
+        if (r == 1)
+            snprintf(s_exportMsg, sizeof(s_exportMsg),
+                     "Salvo: vendas_%04d_%02d.csv", year, month);
+        else
+            snprintf(s_exportMsg, sizeof(s_exportMsg), "Erro ao exportar.");
+    }
+
+    if (s_exportMsg[0]) {
+        bool isError = (s_exportMsg[0] == 'E');
+        DrawText(s_exportMsg,
+                 panel.x + 16,
+                 (int)(panel.y + panel.height - 42),
+                 20, isError ? COL_WARN : COL_TEXT);
+    }
+
     if (GuiButton((Rectangle){panel.x + panel.width - 160,
                                panel.y + panel.height - 52, 130, 36}, "Fechar")) {
-        g_modal      = MODAL_NONE;
-        g_searchEdit = false;
+        g_modal       = MODAL_NONE;
+        g_searchEdit  = false;
+        s_exportMsg[0] = 0;   /* limpa mensagem ao fechar */
     }
 }
 

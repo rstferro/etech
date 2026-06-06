@@ -39,6 +39,9 @@ int main(void) {
     load_csv(CSV_FILE);
     rebuild_filter();
 
+    /* Auto-exporta vendas do mês se estamos nos últimos EXPORT_DIAS_ANTES_FIM dias */
+    VerificarEExportarMesAtual();
+
     const int rowHeight    = 34;
     const int headerHeight = 36;
 

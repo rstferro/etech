@@ -33,6 +33,12 @@
 #define SALES_FILE  "vendas.csv"
 #define QUOTE_FILE  "orcamentos.csv"
 
+/*
+ * Quantos dias antes do fim do mês a exportação automática é acionada.
+ * Ex: 3 = exporta automaticamente nos últimos 3 dias do mês.
+ */
+#define EXPORT_DIAS_ANTES_FIM 1
+
 /* ------- Paleta de cores (requer Color de raylib.h) ------- */
 #define COL_BG       ((Color){ 18,  18,  18, 255})
 #define COL_PANEL    ((Color){ 28,  28,  28, 255})
