@@ -206,3 +206,13 @@ void delete_item(int idx) {
     }
     LeaveCriticalSection(&g_csvLock);
 }
+
+void GerarProximoSKU(char *buffer, int bufferSize) {
+    int max_sku = 0;
+    for (int i = 0; i < g_count; i++) {
+        int current_sku = atoi(g_items[i].sku);
+        if (current_sku > max_sku)
+            max_sku = current_sku;
+    }
+    snprintf(buffer, bufferSize, "%05d", max_sku + 1);
+}

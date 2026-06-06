@@ -21,3 +21,10 @@ void rebuild_filter(void);
 void add_item(const Item *it);
 void update_item(int idx, const Item *it);
 void delete_item(int idx);
+
+/*
+ * Gera o próximo SKU numérico disponível (maior SKU existente + 1),
+ * formatado com 5 dígitos e zeros à esquerda (ex: "00359").
+ * Escreve o resultado em `buffer` (tamanho `bufferSize`).
+ */
+void GerarProximoSKU(char *buffer, int bufferSize);

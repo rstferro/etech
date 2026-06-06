@@ -166,6 +166,7 @@ int main(void) {
         if (g_modal == MODAL_NONE) {
             if (GuiButton(rAdd,   "Adicionar")) {
                 memset(&g_form, 0, sizeof(g_form));
+                GerarProximoSKU(g_form.sku, sizeof(g_form.sku));
                 g_modal = MODAL_ADD; g_searchEdit = false;
                 g_editSku = true; g_editName = false; g_editLoc = false;
                 g_editPrice = false; g_editCost = false; g_qtyEdit = false;

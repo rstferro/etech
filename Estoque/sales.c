@@ -7,6 +7,7 @@
 #include "app_types.h"
 #include "app_state.h"
 #include "utils.h"
+#include "ui_helpers.h"
 #include "sales.h"
 
 /* ------------------------------------------------------------------ */
