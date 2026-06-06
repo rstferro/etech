@@ -1,0 +1,9 @@
+ cd /c/etech_consertos
+nano app_consertos_windows.c
+ gcc app_consertos_windows.c -o etech_consertos.exe -O2 -Wall -lraylib -lwinspool -lopengl32 -lgdi32 -lwinmm
+ ./etech_consertos.exe
+
+cd /c/estoque
+nano app_windows.c
+gcc app_windows.c -o estoque.exe -O2 -Wall -I. -lraylib -lwinspool -lws2_32 -lopengl32 -lgdi32 -lwinmm
+./estoque.exe

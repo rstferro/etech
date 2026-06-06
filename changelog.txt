@@ -1,0 +1,102 @@
+===============================================================================
+                       E-TECH — CONTROLE DE ESTOQUE E VENDAS
+                                CHANGELOG GERAL
+===============================================================================
+
+Este documento consolida todas as modificações, correções de bugs, refatorações 
+e novas funcionalidades implementadas no sistema E-TECH até a presente versão, 
+servindo como guia de referência técnico e histórico de desenvolvimento.
+
+-------------------------------------------------------------------------------
+1. SISTEMA DE ÁREA DE TRANSFERÊNCIA (CTRL+C / CTRL+V AVANÇADO)
+-------------------------------------------------------------------------------
+* [Novo] Implementação de Atalhos Globais: Adicionado suporte nativo a comandos 
+  de teclado Ctrl+C (copiar) e Ctrl+V (colar) aplicados dinamicamente com base 
+  no estado ativo de edição das textboxes (g_searchEdit, g_editSku, g_editName, etc.).
+* [Correção] Comportamento do Ctrl+V (Concatenação): Substituição do método 
+  antigo (strncpy) por strncat. Agora, ao colar um texto em um campo que já contém
+  caracteres, o novo conteúdo é anexado ao final ao invés de apagar tudo.
+* [Correção] Correção de Foco/Cursor Pós-Colagem: Resolvido o problema crítico onde 
+  o cursor de digitação ("pipe") retrocedia para o início do campo após um Ctrl+V.
+  - Solução: Criação de uma flag global (`bool g_forceCursorEnd`) ativada no frame 
+    da colagem e consumida na função customizada `DrawTextInputBoxAdv`. O cursor 
+    (`g_textCursor` e `g_textAnchor`) é forçado de forma segura para o final da string.
+* [Melhoria] Cópia Cirúrgica no Ctrl+C: Corrigido o comportamento "guloso" que 
+  copiava o buffer inteiro da caixa de texto. Agora, o sistema analisa a diferença 
+  entre `g_textCursor` e `g_textAnchor`. Se houver texto selecionado por arrasto ou 
+  teclado, apenas a seleção é extraída para o Clipboard através de cálculo de offset.
+
+-------------------------------------------------------------------------------
+2. INTERFACE GRÁFICA, SCROLL E NAVEGAÇÃO RÁPIDA
+-------------------------------------------------------------------------------
+* [Melhoria] Otimização de Rolagem Dupla (Scroll Ajustado): Separação definitiva da 
+  velocidade do scroll. A rodinha do mouse (GetMouseWheelMove) preserva 100% da 
+  sua precisão original, enquanto a mecânica de clicar e arrastar (Drag-and-Scroll) 
+  ganhou um multiplicador de sensibilidade para conferir maior agilidade.
+* [Novo] Atalhos de Navegação por Página: Implementação das teclas PageUp e PageDown 
+  para saltar instantaneamente para o topo ou para o fim da listagem de mercadorias.
+  - Segurança Anti-Conflito: Adicionada a trava de proteção `!g_searchEdit`. Isso 
+    impede que o pressionamento das teclas mude a página de estoque por acidente 
+    enquanto o usuário digita na barra de pesquisa.
+  - Nota de Design: Teclas Home e End foram descartadas para rolagem para manter seu 
+    uso nativo no deslocamento de cursor dentro da Raygui.
+
+-------------------------------------------------------------------------------
+3. MÓDULO DE VENDAS E IMPRESSÃO TÉRMICA
+-------------------------------------------------------------------------------
+* [Novo] Botão "Adicionar ao Carrinho": Adicionado um novo botão com a sintaxe 
+  padrão GuiButton na janela de Orçamentos. Permite a transferência em lote de 
+  todos os itens pré-selecionados diretamente para o carrinho ativo de vendas.
+* [Novo] Impressão em Duas Vias: Ampliação do módulo de emissão de cupons. 
+  Agora o sistema dispara sequencialmente duas vias na impressora térmica ESC/POS, 
+  identificando-as explicitamente no cabeçalho como "VIA DA LOJA" (para controle 
+  interno de caixa) e "VIA DO CLIENTE".
+* [Arquitetura] Blueprint de Divisão de Código: Planejamento estratégico estruturado 
+  para desacoplar a lógica de impressão do arquivo gigante `app_windows.c`. 
+  Definição das assinaturas para futura criação de módulos isolados:
+  - `impressora.h` (Contrato/Interface das funções de recebimento).
+  - `impressora.c` (Gerenciamento bruto da API de impressão do Windows/Linux).
+
+-------------------------------------------------------------------------------
+4. CORREÇÕES DE BUGS, ESCOPO E COMPILAÇÃO (HOTFIXES)
+-------------------------------------------------------------------------------
+* [Bugfix] Correção de Travamento de Tela Preta (Laço de Entrada): Corrigido erro de 
+  fechamento de chaves na verificação de atalhos. O bloco de controle de teclas 
+  estava englobando o `BeginDrawing()`, fazendo com que a tela só atualizasse se o 
+  usuário ficasse segurando a tecla CTRL. Chave realocada para antes do desenho.
+* [Bugfix] Erro de Compilação 'panel' Undeclared: Solucionado o erro de escopo na 
+  linha 2081 do arquivo principal. Uma chave intrometida logo após o GuiSpinner de 
+  descontos fechava o escopo do carrinho antes da hora, isolando a struct `Rectangle cartHeader`. 
+  A remoção da chave restabeleceu a árvore sintática correta.
+* [Bugfix] Variáveis e Constantes Raylib Inexistentes:
+  - Declarada globalmente a variável `dragStartY` para o funcionamento do clique e arrasto.
+  - Corrigida a grafia da constante de clique do mouse de `MOUSE_LEFT_BUTTON` para 
+    o padrão oficial da biblioteca: `MOUSE_BUTTON_LEFT`.
+
+-------------------------------------------------------------------------------
+5. INFRAESTRUTURA, COMPILAÇÃO E PORTABILIDADE
+-------------------------------------------------------------------------------
+* [Ambiente] Otimização no MSYS64 (UCRT64): Ajuste dos parâmetros de linkage no GCC 
+  utilizando flags explícitas de compilação:
+  `gcc app_windows.c -o estoque.exe -O2 -Wall -I. -lraylib -lwinspool -lws2_32 -lopengl32 -lgdi32 -lwinmm`
+* [Portabilidade] Mapeamento para Linux (Zorin OS): Realizado estudo completo de 
+  mudança de plataforma, documentando as seções que exigirão refatoração condicional 
+  (#ifdef / #ifndef) devido ao uso de APIs nativas do Windows:
+  - Substituição de `<winsock2.h>` e `<ws2tcpip.h>` por sockets POSIX (`<sys/socket.h>`).
+  - Substituição de `<process.h>` (Threads Windows) por POSIX Threads (`<pthread.h>`).
+  - Substituição de `<winspool.h>` por controle de spool do Linux via subsistema CUPS.
+  - Preservação intacta de toda a camada visual UI por ser baseada puramente em Raylib/Raygui.
+
+-------------------------------------------------------------------------------
+6. RECOMENDAÇÕES E PRÓXIMOS PASSOS (BRAINSTORM)
+-------------------------------------------------------------------------------
+* Monitorar o comportamento de filtragem assíncrona na interface (relatos eventuais 
+  de "X itens encontrados" mas sem exibição visual rápida na tela).
+* Executar a divisão física do arquivo `app_windows.c` em módulos menores (`.c` e `.h`) 
+  para melhorar o tempo de localização de funções e organização no VS Code.
+* Iniciar tratativas de documentação para futura integração opcional com a API Goomer 
+  utilizando `libcurl` e `cJSON`.
+
+===============================================================================
+                     Barda da E-Tech 🫡 | Junho de 2026
+===============================================================================
