@@ -21,6 +21,7 @@
 #include "sales.h"
 #include "network.h"
 #include "audit.h"
+#include "undo.h"
 
 int main(void) {
     /* Inicializa travas antes de qualquer thread */
@@ -44,6 +45,10 @@ int main(void) {
     /* Auto-exporta vendas do mês se estamos nos últimos EXPORT_DIAS_ANTES_FIM dias */
     VerificarEExportarMesAtual();
 
+    /* Mostra o diretório de trabalho na barra de título para que o usuário
+     * saiba exatamente onde estoque.csv e audit.log são salvos */
+    SetWindowTitle(TextFormat("Estoque — pasta: %s", GetWorkingDirectory()));
+
     const int rowHeight    = 34;
     const int headerHeight = 36;
 
@@ -62,6 +67,17 @@ int main(void) {
         }
         if (IsKeyPressed(KEY_F7)) {
             g_modal = MODAL_AUDIT_LOG; g_searchEdit = false;
+        }
+
+        /* ---- Ctrl+Z: desfazer última operação no estoque ---- */
+        if (g_modal == MODAL_NONE
+            && (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
+            && IsKeyPressed(KEY_Z)
+            && undo_has_pending()) {
+            undo_apply();
+            rebuild_filter();
+            save_csv(CSV_FILE);
+            g_needPush = 1;
         }
 
         /* ---- Ctrl+C / Ctrl+V ---- */
@@ -210,7 +226,7 @@ int main(void) {
 
         /* ---- Tabela principal ---- */
         int left   = 16, right = GetScreenWidth() - 16;
-        int topY   = 76, bottom = GetScreenHeight() - 16;
+        int topY   = 76, bottom = GetScreenHeight() - 62; /* era -16; agora deixa espaço para o rodapé */
         int c1 = 180, c2 = 610, c3 = 760, c4 = 840, c5 = 960;
 
         Rectangle rHeader = {left, (float)topY, (float)(right - left), (float)headerHeight};
@@ -224,16 +240,18 @@ int main(void) {
         int hdrX[]     = {left, c1, c2, c3, c4, c5};
         int hdrXEnd[]  = {c1,   c2, c3, c4, c5, right};
 
+        bool anyHdrHover = false;
         for (int h = 0; h < 6; h++) {
             Rectangle cell = {(float)hdrX[h], (float)topY,
                               (float)(hdrXEnd[h] - hdrX[h]), (float)headerHeight};
             bool hover  = (g_modal == MODAL_NONE
                            && CheckCollisionPointRec(GetMousePosition(), cell));
             bool active = (g_sortCol == hdrCols[h]);
+            if (hover) anyHdrHover = true;
 
             /* Fundo realçado */
-            if (active) DrawRectangleRec(cell, (Color){122, 61, 245,  40});
-            if (hover)  DrawRectangleRec(cell, (Color){255, 255, 255, 12});
+            if (active) DrawRectangleRec(cell, (Color){122, 61, 245,  60});
+            if (hover)  DrawRectangleRec(cell, (Color){255, 255, 255, 30});
 
             /* Texto da coluna */
             Color lblColor = active ? (Color){200, 170, 255, 255} : COL_TEXT;
@@ -244,8 +262,14 @@ int main(void) {
                 int lw = MeasureText(hdrLabels[h], 18);
                 DrawText(g_sortAsc ? " ^" : " v",
                          hdrX[h] + 8 + lw, topY + 9, 18,
-                         (Color){180, 130, 255, 255});
+                         (Color){220, 180, 255, 255});
             }
+
+            /* Sublinha de hover para indicar que é clicável */
+            if (hover && !active)
+                DrawLine(hdrX[h]+4,    topY + headerHeight - 3,
+                         hdrXEnd[h]-4, topY + headerHeight - 3,
+                         (Color){180, 180, 180, 140});
 
             /* Divisor vertical entre colunas */
             if (h < 5)
@@ -267,6 +291,8 @@ int main(void) {
                 apply_sort();
             }
         }
+        /* Cursor de ponteiro ao passar sobre cabeçalho clicável */
+        SetMouseCursor(anyHdrHover ? MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
 
         Rectangle rList = {left, topY + headerHeight,
                            (float)(right - left),
@@ -343,7 +369,13 @@ int main(void) {
             } else { GuiButton(rPlus, "+"); }
         }
 
-        /* ---- Rodapé ---- */
+        /* ---- Rodapé (fundo separado da tabela) ---- */
+        DrawRectangle(0, GetScreenHeight() - 58,
+                      GetScreenWidth(), 58, COL_PANEL);
+        DrawLine(0,            GetScreenHeight() - 58,
+                 GetScreenWidth(), GetScreenHeight() - 58,
+                 (Color){80, 80, 80, 255});
+
         Rectangle rFooter = {16, (float)(GetScreenHeight()-48),
                              (float)(GetScreenWidth()-32), 32};
         if (g_modal == MODAL_NONE) {
@@ -369,6 +401,19 @@ int main(void) {
                             g_connected ? g_peerStatus : "Desconectado",
                             linuxTxt, prnTxt),
                  rFooter.x+400, rFooter.y+6, 20, COL_TEXT_DIM);
+
+        /* Dica de desfazer alinhada à direita */
+        if (undo_has_pending()) {
+            const char *undoDesc = undo_description();
+            int undoW = MeasureText(undoDesc, 17);
+            DrawRectangle(GetScreenWidth() - undoW - 28,
+                          (int)rFooter.y + 3, undoW + 16, 26,
+                          (Color){60, 40, 90, 180});
+            DrawText(undoDesc,
+                     GetScreenWidth() - undoW - 20,
+                     (int)rFooter.y + 7, 17,
+                     (Color){200, 170, 255, 255});
+        }
 
         /* ---- Sobreposição escura para modais ---- */
         if (g_modal != MODAL_NONE)

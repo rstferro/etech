@@ -8,6 +8,7 @@
 #include "app_state.h"
 #include "utils.h"
 #include "audit.h"
+#include "undo.h"
 #include "csv_io.h"
 
 /* ------------------------------------------------------------------ */
@@ -94,6 +95,7 @@ int load_csv(const char *path) {
     }
     fclose(f);
     LeaveCriticalSection(&g_csvLock);
+    undo_clear();   /* estado foi substituído; histórico não é mais válido */
     return 1;
 }
 
@@ -169,6 +171,7 @@ void apply_csv_text(const char *txt) {
     g_savingRemoteCsv = 1;
     save_csv(CSV_FILE);
     g_savingRemoteCsv = 0;
+    undo_clear();   /* CSV remoto substituiu o estado local */
 }
 
 /* ------------------------------------------------------------------ */
@@ -232,6 +235,7 @@ void add_item(const Item *it) {
     if (g_count < MAX_ITEMS) g_items[g_count++] = *it;
     LeaveCriticalSection(&g_csvLock);
     audit_item_add(it);
+    undo_push_add(it);
 }
 
 void update_item(int idx, const Item *it) {
@@ -246,7 +250,10 @@ void update_item(int idx, const Item *it) {
     }
     LeaveCriticalSection(&g_csvLock);
 
-    if (valid) audit_item_edit(&before, it);
+    if (valid) {
+        audit_item_edit(&before, it);
+        undo_push_edit(idx, &before);
+    }
 }
 
 void delete_item(int idx) {
@@ -263,7 +270,10 @@ void delete_item(int idx) {
     }
     LeaveCriticalSection(&g_csvLock);
 
-    if (valid) audit_item_delete(&deleted);
+    if (valid) {
+        audit_item_delete(&deleted);
+        undo_push_delete(idx, &deleted);
+    }
 }
 
 void GerarProximoSKU(char *buffer, int bufferSize) {

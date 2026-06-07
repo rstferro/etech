@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "ui_helpers.h"
 #include "audit.h"
+#include "math.h"
 
 /* ------------------------------------------------------------------ */
 /* Estado interno                                                       */

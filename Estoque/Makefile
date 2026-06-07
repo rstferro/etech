@@ -31,7 +31,9 @@ LDFLAGS = -L$(RAYLIB_DIR) -lraylib \
           -static-libgcc
 
 # ---- Fontes e objetos ----
-SRCS = app_state.c  \
+SRCS = sqlite3.c     \
+       db_io.c       \
+       app_state.c   \
        utils.c       \
        ui_helpers.c  \
        csv_io.c      \
@@ -39,6 +41,7 @@ SRCS = app_state.c  \
        sales.c       \
        network.c     \
        audit.c       \
+       undo.c        \
        app_windows.c
 
 OBJS = $(SRCS:.c=.o)
@@ -63,14 +66,15 @@ $(TARGET): $(OBJS)
 app_state.o:   app_state.c   platform.h app_types.h  app_state.h
 utils.o:       utils.c       platform.h utils.h
 ui_helpers.o:  ui_helpers.c  platform.h app_config.h app_state.h ui_helpers.h
-csv_io.o:      csv_io.c      platform.h app_config.h app_types.h app_state.h utils.h csv_io.h
+csv_io.o:      csv_io.c      platform.h app_config.h app_types.h app_state.h utils.h audit.h undo.h csv_io.h
 printer.o:     printer.c     platform.h app_config.h app_types.h app_state.h utils.h printer.h
 sales.o:       sales.c       platform.h app_config.h app_types.h app_state.h utils.h audit.h sales.h
 network.o:     network.c     platform.h app_config.h app_types.h app_state.h \
                               csv_io.h sales.h printer.h network.h
-audit.o:       audit.c       platform.h app_config.h app_types.h app_state.h audit.h
+audit.o:       audit.c       platform.h app_config.h app_types.h app_state.h utils.h ui_helpers.h audit.h
+undo.o:        undo.c        platform.h app_config.h app_types.h app_state.h undo.h
 app_windows.o: app_windows.c platform.h app_config.h app_types.h app_state.h \
-                              utils.h ui_helpers.h csv_io.h printer.h sales.h network.h audit.h
+                              utils.h ui_helpers.h csv_io.h printer.h sales.h network.h audit.h undo.h
 
 clean:
 	-del /f /q $(OBJS) $(TARGET) 2>nul || rm -f $(OBJS) $(TARGET)
