@@ -37,7 +37,7 @@
  * Quantos dias antes do fim do mês a exportação automática é acionada.
  * Ex: 3 = exporta automaticamente nos últimos 3 dias do mês.
  */
-#define EXPORT_DIAS_ANTES_FIM 1
+#define EXPORT_DIAS_ANTES_FIM 3
 
 /* ------- Paleta de cores (requer Color de raylib.h) ------- */
 #define COL_BG       ((Color){ 18,  18,  18, 255})

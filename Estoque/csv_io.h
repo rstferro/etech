@@ -18,6 +18,7 @@ void apply_csv_text(const char *txt);
 
 /* ------- Filtro / CRUD ------- */
 void rebuild_filter(void);
+void apply_sort(void);   /* reordena filtered_indices[] pelo g_sortCol/g_sortAsc atuais */
 void add_item(const Item *it);
 void update_item(int idx, const Item *it);
 void delete_item(int idx);

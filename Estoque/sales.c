@@ -8,6 +8,7 @@
 #include "app_state.h"
 #include "utils.h"
 #include "ui_helpers.h"
+#include "audit.h"
 #include "sales.h"
 
 /* ------------------------------------------------------------------ */
@@ -205,6 +206,8 @@ void append_sales_csv(const char *seller, CartItem *cart, int cartCount, int dis
     }
     fclose(f);
     g_salesNeedPush = 1;
+
+    audit_sale(seller, cart, cartCount, discPct);
 }
 
 void sales_file_to_text(char **outBuf, int *outLen) {
@@ -322,6 +325,8 @@ void append_quote_csv(const char *seller, CartItem *cart, int cartCount) {
         fwrite(line, 1, strlen(line), f);
     }
     fclose(f);
+
+    audit_quote(seller, cart, cartCount);
 }
 
 /* ------------------------------------------------------------------ */

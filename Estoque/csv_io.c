@@ -7,6 +7,7 @@
 #include "app_types.h"
 #include "app_state.h"
 #include "utils.h"
+#include "audit.h"
 #include "csv_io.h"
 
 /* ------------------------------------------------------------------ */
@@ -170,6 +171,46 @@ void apply_csv_text(const char *txt) {
     g_savingRemoteCsv = 0;
 }
 
+/* ------------------------------------------------------------------ */
+/* Ordenação da tabela                                                  */
+/* ------------------------------------------------------------------ */
+
+static int sort_compare(const void *a, const void *b) {
+    int ia = *(const int *)a;
+    int ib = *(const int *)b;
+    if (ia < 0 || ia >= g_count || ib < 0 || ib >= g_count) return 0;
+
+    const Item *pa = &g_items[ia];
+    const Item *pb = &g_items[ib];
+    int cmp = 0;
+
+    switch (g_sortCol) {
+        case SORT_COL_SKU:
+            cmp = strcmp(pa->sku, pb->sku); break;
+        case SORT_COL_NAME:
+            cmp = strcmp(pa->name, pb->name); break;
+        case SORT_COL_LOCATION:
+            cmp = strcmp(pa->location, pb->location); break;
+        case SORT_COL_QTY:
+            cmp = (pa->qty > pb->qty) - (pa->qty < pb->qty); break;
+        case SORT_COL_PRICE:
+            cmp = (pa->price > pb->price) - (pa->price < pb->price); break;
+        case SORT_COL_COST:
+            cmp = (pa->cost_price > pb->cost_price) - (pa->cost_price < pb->cost_price); break;
+        default: return 0;
+    }
+    return g_sortAsc ? cmp : -cmp;
+}
+
+void apply_sort(void) {
+    if (g_sortCol == SORT_COL_NONE || filtered_count <= 1) return;
+    qsort(filtered_indices, (size_t)filtered_count, sizeof(int), sort_compare);
+}
+
+/* ------------------------------------------------------------------ */
+/* Filtro / CRUD                                                        */
+/* ------------------------------------------------------------------ */
+
 void rebuild_filter(void) {
     filtered_count = 0;
     for (int i = 0; i < g_count; i++) {
@@ -183,28 +224,46 @@ void rebuild_filter(void) {
     }
     if (g_selected >= filtered_count) g_selected = filtered_count - 1;
     if (filtered_count <= 0)          g_scrollIndex = 0;
+    apply_sort(); /* mantém a ordenação ativa após filtrar */
 }
 
 void add_item(const Item *it) {
     EnterCriticalSection(&g_csvLock);
     if (g_count < MAX_ITEMS) g_items[g_count++] = *it;
     LeaveCriticalSection(&g_csvLock);
+    audit_item_add(it);
 }
 
 void update_item(int idx, const Item *it) {
+    Item   before = {0};
+    bool   valid  = false;
+
     EnterCriticalSection(&g_csvLock);
-    if (idx >= 0 && idx < g_count) g_items[idx] = *it;
+    if (idx >= 0 && idx < g_count) {
+        before        = g_items[idx]; /* captura o estado ANTES de sobrescrever */
+        g_items[idx]  = *it;
+        valid         = true;
+    }
     LeaveCriticalSection(&g_csvLock);
+
+    if (valid) audit_item_edit(&before, it);
 }
 
 void delete_item(int idx) {
+    Item deleted = {0};
+    bool valid   = false;
+
     EnterCriticalSection(&g_csvLock);
     if (idx >= 0 && idx < g_count) {
+        deleted = g_items[idx]; /* captura o item ANTES de remover */
         for (int i = idx; i < g_count - 1; i++) g_items[i] = g_items[i+1];
         g_count--;
         g_selected = -1;
+        valid = true;
     }
     LeaveCriticalSection(&g_csvLock);
+
+    if (valid) audit_item_delete(&deleted);
 }
 
 void GerarProximoSKU(char *buffer, int bufferSize) {

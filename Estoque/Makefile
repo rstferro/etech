@@ -38,6 +38,7 @@ SRCS = app_state.c  \
        printer.c     \
        sales.c       \
        network.c     \
+       audit.c       \
        app_windows.c
 
 OBJS = $(SRCS:.c=.o)
@@ -64,11 +65,12 @@ utils.o:       utils.c       platform.h utils.h
 ui_helpers.o:  ui_helpers.c  platform.h app_config.h app_state.h ui_helpers.h
 csv_io.o:      csv_io.c      platform.h app_config.h app_types.h app_state.h utils.h csv_io.h
 printer.o:     printer.c     platform.h app_config.h app_types.h app_state.h utils.h printer.h
-sales.o:       sales.c       platform.h app_config.h app_types.h app_state.h utils.h sales.h
+sales.o:       sales.c       platform.h app_config.h app_types.h app_state.h utils.h audit.h sales.h
 network.o:     network.c     platform.h app_config.h app_types.h app_state.h \
                               csv_io.h sales.h printer.h network.h
+audit.o:       audit.c       platform.h app_config.h app_types.h app_state.h audit.h
 app_windows.o: app_windows.c platform.h app_config.h app_types.h app_state.h \
-                              utils.h ui_helpers.h csv_io.h printer.h sales.h network.h
+                              utils.h ui_helpers.h csv_io.h printer.h sales.h network.h audit.h
 
 clean:
 	-del /f /q $(OBJS) $(TARGET) 2>nul || rm -f $(OBJS) $(TARGET)

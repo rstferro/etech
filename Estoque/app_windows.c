@@ -20,12 +20,14 @@
 #include "printer.h"
 #include "sales.h"
 #include "network.h"
+#include "audit.h"
 
 int main(void) {
     /* Inicializa travas antes de qualquer thread */
     InitializeCriticalSection(&g_csvLock);
     InitializeCriticalSection(&g_sockLock);
     InitializeCriticalSection(&g_sendLock);
+    audit_init();
 
     /* Servidor TCP em background */
     _beginthreadex(NULL, 0, server_thread, NULL, 0, NULL);
@@ -57,6 +59,9 @@ int main(void) {
         }
         if (IsKeyPressed(KEY_F6) && g_modal == MODAL_NONE) {
             save_csv(CSV_FILE);
+        }
+        if (IsKeyPressed(KEY_F7)) {
+            g_modal = MODAL_AUDIT_LOG; g_searchEdit = false;
         }
 
         /* ---- Ctrl+C / Ctrl+V ---- */
@@ -210,12 +215,58 @@ int main(void) {
 
         Rectangle rHeader = {left, (float)topY, (float)(right - left), (float)headerHeight};
         DrawRectangleRec(rHeader, COL_HEADER);
-        DrawText("SKU",   left+8, topY+8, 18, COL_TEXT);
-        DrawText("Nome",  c1+8,   topY+8, 18, COL_TEXT);
-        DrawText("Local", c2+8,   topY+8, 18, COL_TEXT);
-        DrawText("Qtd",   c3+8,   topY+8, 18, COL_TEXT);
-        DrawText("Preço", c4+8,   topY+8, 18, COL_TEXT);
-        DrawText("Custo", c5+8,   topY+8, 18, COL_TEXT);
+
+        /* Cabeçalhos clicáveis para ordenação
+         * Ciclo por clique: nenhum → crescente → decrescente → nenhum */
+        const char *hdrLabels[] = {"SKU", "Nome", "Local", "Qtd", "Preco", "Custo"};
+        int hdrCols[]  = {SORT_COL_SKU, SORT_COL_NAME, SORT_COL_LOCATION,
+                          SORT_COL_QTY, SORT_COL_PRICE, SORT_COL_COST};
+        int hdrX[]     = {left, c1, c2, c3, c4, c5};
+        int hdrXEnd[]  = {c1,   c2, c3, c4, c5, right};
+
+        for (int h = 0; h < 6; h++) {
+            Rectangle cell = {(float)hdrX[h], (float)topY,
+                              (float)(hdrXEnd[h] - hdrX[h]), (float)headerHeight};
+            bool hover  = (g_modal == MODAL_NONE
+                           && CheckCollisionPointRec(GetMousePosition(), cell));
+            bool active = (g_sortCol == hdrCols[h]);
+
+            /* Fundo realçado */
+            if (active) DrawRectangleRec(cell, (Color){122, 61, 245,  40});
+            if (hover)  DrawRectangleRec(cell, (Color){255, 255, 255, 12});
+
+            /* Texto da coluna */
+            Color lblColor = active ? (Color){200, 170, 255, 255} : COL_TEXT;
+            DrawText(hdrLabels[h], hdrX[h] + 8, topY + 9, 18, lblColor);
+
+            /* Indicador de direção ao lado do rótulo */
+            if (active) {
+                int lw = MeasureText(hdrLabels[h], 18);
+                DrawText(g_sortAsc ? " ^" : " v",
+                         hdrX[h] + 8 + lw, topY + 9, 18,
+                         (Color){180, 130, 255, 255});
+            }
+
+            /* Divisor vertical entre colunas */
+            if (h < 5)
+                DrawLine(hdrXEnd[h], topY + 6, hdrXEnd[h], topY + headerHeight - 6,
+                         (Color){60, 60, 60, 255});
+
+            /* Clique: alterna crescente → decrescente → sem ordenação */
+            if (hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                if (g_sortCol == hdrCols[h]) {
+                    if (g_sortAsc)  g_sortAsc = false;        /* asc → desc */
+                    else {          g_sortCol = SORT_COL_NONE; /* desc → nenhum */
+                                    g_sortAsc = true; }
+                } else {
+                    g_sortCol = hdrCols[h];
+                    g_sortAsc = true;                          /* nova coluna → asc */
+                }
+                g_selected    = -1;
+                g_scrollIndex = 0;
+                apply_sort();
+            }
+        }
 
         Rectangle rList = {left, topY + headerHeight,
                            (float)(right - left),
@@ -301,9 +352,13 @@ int main(void) {
             if (GuiButton((Rectangle){rFooter.x+128, rFooter.y, 140, rFooter.height}, "Carregar CSV (F5)")) {
                 load_csv(CSV_FILE); rebuild_filter(); g_needPush = 1;
             }
+            if (GuiButton((Rectangle){rFooter.x+276, rFooter.y, 110, rFooter.height}, "Log (F7)")) {
+                g_modal = MODAL_AUDIT_LOG; g_searchEdit = false;
+            }
         } else {
             GuiButton((Rectangle){rFooter.x,     rFooter.y, 120, rFooter.height}, "Salvar CSV (F6)");
             GuiButton((Rectangle){rFooter.x+128, rFooter.y, 140, rFooter.height}, "Carregar CSV (F5)");
+            GuiButton((Rectangle){rFooter.x+276, rFooter.y, 110, rFooter.height}, "Log (F7)");
         }
 
         const char *linuxTxt = g_linuxConnected ? "Linux conectado" : "Linux desconectado";
@@ -313,7 +368,7 @@ int main(void) {
                             g_count, filtered_count, g_cartCount, g_quoteCount,
                             g_connected ? g_peerStatus : "Desconectado",
                             linuxTxt, prnTxt),
-                 rFooter.x+280, rFooter.y+6, 20, COL_TEXT_DIM);
+                 rFooter.x+400, rFooter.y+6, 20, COL_TEXT_DIM);
 
         /* ---- Sobreposição escura para modais ---- */
         if (g_modal != MODAL_NONE)
@@ -602,6 +657,9 @@ int main(void) {
         /* ================================================================ */
         } else if (g_modal == MODAL_MONTH_SALES) {
             DrawMonthlySalesModal();
+
+        } else if (g_modal == MODAL_AUDIT_LOG) {
+            DrawAuditLogModal();
 
         /* ================================================================ */
         } else if (g_modal == MODAL_QUOTE) {

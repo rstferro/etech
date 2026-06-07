@@ -98,5 +98,9 @@ float  g_moneyDragStartX  = 0.0f;
 int    g_moneyRepeatKey   = 0;
 double g_moneyRepeatNext  = 0.0;
 
+/* ------- Ordenação da tabela principal ------- */
+int  g_sortCol = SORT_COL_NONE;
+bool g_sortAsc = true;
+
 /* ------- Scroll do relatório mensal de vendas ------- */
 int g_salesScroll = 0;

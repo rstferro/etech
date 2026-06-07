@@ -97,5 +97,9 @@ extern float  g_moneyDragStartX;
 extern int    g_moneyRepeatKey;
 extern double g_moneyRepeatNext;
 
+/* ------- Ordenação da tabela principal ------- */
+extern int  g_sortCol; /* SortColumn: coluna ativa (SORT_COL_NONE = sem ordem) */
+extern bool g_sortAsc; /* true = crescente, false = decrescente */
+
 /* ------- Scroll do relatório mensal de vendas ------- */
 extern int g_salesScroll;
